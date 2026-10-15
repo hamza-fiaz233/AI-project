@@ -1,0 +1,11 @@
+venv/
+.env
+chromad_db/
+*.db
+__pycache__/
+*.pyc
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+^Z
