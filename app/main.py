@@ -3,8 +3,15 @@ import sys
 # Ensure project root is in python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+from dotenv import load_dotenv
+load_dotenv()  # Automatically loads OPENAI_API_KEY from the .env file
+
 import streamlit as st
 from langchain_core.messages import HumanMessage, AIMessage
+from langchain_community.document_loaders import PyMuPDFLoader
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_community.vectorstores import Chroma
 from agent.graph import app as agent_app
 
 # Page Configuration
@@ -41,17 +48,55 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("📈 FinAI Analyst: Agentic RAG Financial Research Assistant")
-st.caption("Combine real-time market data (yfinance) with SEC document intelligence & ChromaDB.")
+st.caption("Combine real-time market data (yfinance) with SEC document intelligence & ChromaDB.")[cite: 7]
 
-# Sidebar Configuration for Session & Ticker Selection
+# Sidebar Configuration for Session, Ticker, and PDF Upload & Auto-Indexing
 with st.sidebar:
     st.header("⚙️ Session Settings")
     thread_id = st.text_input("Thread ID / Session Name", value="default_investor")
     
     st.divider()
+    st.subheader("📁 Upload SEC / Financial PDF")
+    uploaded_pdf = st.file_uploader("Choose a PDF file", type=["pdf"])
+    
+    if uploaded_pdf is not None:
+        os.makedirs("data", exist_ok=True)
+        pdf_path = os.path.join("data", uploaded_pdf.name)
+        
+        # Save file to disk
+        with open(pdf_path, "wb") as f:
+            f.write(uploaded_pdf.getbuffer())
+        
+        # Automatically process and index the PDF into ChromaDB (Module A Pipeline)
+        with st.spinner("Processing and indexing document into ChromaDB..."):
+            try:
+                loader = PyMuPDFLoader(pdf_path)
+                pages = loader.load()
+                
+                splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=150)[cite: 12]
+                chunks = splitter.split_documents(pages)
+                
+                for c in chunks:
+                    c.metadata.update({
+                        'ticker': 'CUSTOM', 
+                        'doc_type': 'Uploaded_PDF', 
+                        'source_file': uploaded_pdf.name
+                    })
+                
+                embeddings = HuggingFaceEmbeddings(model_name='BAAI/bge-small-en-v1.5')[cite: 12, 13]
+                vectordb = Chroma.from_documents(
+                    chunks, 
+                    embeddings, 
+                    persist_directory='./chroma_db'
+                )
+                st.success(f"Successfully indexed {uploaded_pdf.name} into vector store!")
+            except Exception as e:
+                st.error(f"Error during ingestion: {str(e)}")
+    
+    st.divider()
     st.subheader("📊 Target Asset Info")
     target_ticker = st.text_input("Primary Ticker", value="AAPL").upper()
-    doc_type = st.selectbox("SEC Document Type", ["10-K", "10-Q", "Transcript"])
+    doc_type = st.selectbox("SEC Document Type", ["10-K", "10-Q", "Transcript"])[cite: 11]
     
     st.divider()
     if st.button("🗑️ Clear Conversation History"):
@@ -69,7 +114,6 @@ for message in st.session_state.messages:
 
 # Handle User Input
 if prompt := st.chat_input(f"Ask a question about {target_ticker} or financial markets..."):
-    # Append user message
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
@@ -81,12 +125,9 @@ if prompt := st.chat_input(f"Ask a question about {target_ticker} or financial m
         
         try:
             config = {"configurable": {"thread_id": thread_id}}
-            
-            # Invoke the compiled LangGraph workflow app
             inputs = {"messages": [HumanMessage(content=prompt)]}
             response_state = agent_app.invoke(inputs, config=config)
             
-            # Extract the latest AI message response
             ai_messages = [m for m in response_state["messages"] if isinstance(m, AIMessage)]
             latest_response = ai_messages[-1].content if ai_messages else "No response generated."
             
