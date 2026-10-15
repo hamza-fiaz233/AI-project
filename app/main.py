@@ -48,7 +48,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("📈 FinAI Analyst: Agentic RAG Financial Research Assistant")
-st.caption("Combine real-time market data (yfinance) with SEC document intelligence & ChromaDB.")[cite: 7]
+st.caption("Combine real-time market data (yfinance) with SEC document intelligence & ChromaDB.")
 
 # Sidebar Configuration for Session, Ticker, and PDF Upload & Auto-Indexing
 with st.sidebar:
@@ -67,13 +67,13 @@ with st.sidebar:
         with open(pdf_path, "wb") as f:
             f.write(uploaded_pdf.getbuffer())
         
-        # Automatically process and index the PDF into ChromaDB (Module A Pipeline)
+        # Automatically process and index the PDF into ChromaDB
         with st.spinner("Processing and indexing document into ChromaDB..."):
             try:
                 loader = PyMuPDFLoader(pdf_path)
                 pages = loader.load()
                 
-                splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=150)[cite: 12]
+                splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=150)
                 chunks = splitter.split_documents(pages)
                 
                 for c in chunks:
@@ -83,7 +83,7 @@ with st.sidebar:
                         'source_file': uploaded_pdf.name
                     })
                 
-                embeddings = HuggingFaceEmbeddings(model_name='BAAI/bge-small-en-v1.5')[cite: 12, 13]
+                embeddings = HuggingFaceEmbeddings(model_name='BAAI/bge-small-en-v1.5')
                 vectordb = Chroma.from_documents(
                     chunks, 
                     embeddings, 
@@ -96,7 +96,7 @@ with st.sidebar:
     st.divider()
     st.subheader("📊 Target Asset Info")
     target_ticker = st.text_input("Primary Ticker", value="AAPL").upper()
-    doc_type = st.selectbox("SEC Document Type", ["10-K", "10-Q", "Transcript"])[cite: 11]
+    doc_type = st.selectbox("SEC Document Type", ["10-K", "10-Q", "Transcript"])
     
     st.divider()
     if st.button("🗑️ Clear Conversation History"):
